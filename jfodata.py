@@ -8,7 +8,7 @@ pacote para plotes de dados com fuçoes rotineiras do pacote jfodata
 
 
 """
-import matplotlib.pyplot as plt ,mpld3
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 from scipy import interpolate
