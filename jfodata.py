@@ -17,6 +17,18 @@ import numpy as np
 import math
 import pandas as pd
 
+plt.rcParams['axes.linewidth'] = 1.4
+plt.rcParams['figure.figsize']= (12,9)
+
+plt.rcParams['font.size'] = 32
+plt.rcParams['legend.fontsize'] = 'large'
+plt.rcParams['figure.titlesize'] = 'medium'
+plt.rcParams['axes.labelsize']=32
+plt.rcParams['savefig.bbox']='tight'
+
+work=os.getcwd().split('PHD')[0]+ r'PHD\Medidas ADR\Dados py\functions'
+os.chdir (r'C:\Users\jaime\Google Drive\PHD\Medidas ADR\Dados py\functions')
+
 class plot:
         """
          seila
@@ -28,6 +40,8 @@ class plot:
             self.x = x
             self.y = y
             plt.plot(x,y,**dic)
+            plt.xlabel(x.name)           
+            plt.ylabel(y.name) 
         
         def nx(self,xn,dic={}):
             '''
@@ -37,9 +51,7 @@ class plot:
             plt.plot(self.x,self.y/self.y[yni],**dic)
         def plot(self,dic={}):
             plt.plot(self.x,self.y,**dic)
-            
-            
-            
+             
             
 class urso:
     '''
