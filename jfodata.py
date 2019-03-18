@@ -27,15 +27,16 @@ plt.rcParams['axes.labelsize']=32
 plt.rcParams['savefig.bbox']='tight'
 
 work=os.getcwd().split('PHD')[0]+ r'PHD\Medidas ADR\Dados py\functions'
-os.chdir (r'C:\Users\jaime\Google Drive\PHD\Medidas ADR\Dados py\functions')
+os.chdir (work)
 
 
-def pdinter(data,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
+def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     ''' 
     função que faz a interpolção em uma faixa 
     '''
     import numpy as np
     from scipy import interpolate 
+    data=data1
     data.sort_values(dadox,ascending=True,inplace=True)
     data.dropna(axis=1 ,how='all', inplace=True)
     data.drop_duplicates(dadox,inplace=True)
