@@ -27,7 +27,7 @@ plt.rcParams['axes.labelsize']=32
 plt.rcParams['savefig.bbox']='tight'
 
 work=os.getcwd().split('PHD')[0]+ r'PHD\Medidas ADR\Dados py\functions'
-os.chdir (work)
+os.chdir (r'C:\Users\jaime\Google Drive\PHD\Medidas ADR\Dados py\functions')
 
 
 def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
@@ -90,6 +90,14 @@ def saveMREDC(data,T,V,F,I):
     df['R (Ohns)']=data[V]/(I/1000)
     df['Field (T)']=data[F]/10000
     return df
+#%%
+
+def dfindex(df,columns,value):
+    
+    'isso returna o index do row com o valor que você quer'
+    import numpy as np
+    return (np.abs(df[columns]-value)).idxmin()
+#%%
 
 
 
@@ -228,3 +236,31 @@ class urso:
     
         spl = interpolate.UnivariateSpline(df[dadox], df[dadoy], k=K , s=smoothing,ext=3)
         return spl , xs
+    def fit(f,x,y,limitx,plot=0):
+        
+        popt,pcov=curve_fit(f,x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])])
+        if plot==1:
+            plt.plot(x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],label='data')
+            plt.plot(x[(x>limitx[0])&(x<limitx[1])],f(x[(x>limitx[0])&(x<limitx[1])],*popt),'+',label='fit')
+            plt.legend()
+        return popt,pcov
+    def plot(*args):
+        '''
+        func para fazer os plots de dados e coloca os limites 10%acima do colocado como utlimos parametros
+        ex:
+        dados limites em tuplas plot(*args,(xl,xu))
+        '''
+        plt.plot(*args[:-1])
+        plt.xlim(*args[-1])
+        col=args[0]
+        xmin=args[-1][0]
+        xmax=args[-1][1]
+        x1=(np.abs(args[0]-xmin)).idxmin()
+        x2=(np.abs(args[0]-xmax)).idxmin()
+        if args[1][x1]<args[1][x2]:
+            y1=(args[1][x1],args[1][x2])
+        else:
+            y1=(args[1][x2],args[1][x1])
+        plt.ylim(y1)            
+    
+        
