@@ -27,7 +27,7 @@ plt.rcParams['axes.labelsize']=32
 plt.rcParams['savefig.bbox']='tight'
 
 work=os.getcwd().split('PHD')[0]+ r'PHD\Medidas ADR\Dados py\functions'
-os.chdir (r'C:\Users\jaime\Google Drive\PHD\Medidas ADR\Dados py\functions')
+os.chdir (work)
 
 
 def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
@@ -261,6 +261,26 @@ class urso:
             y1=(args[1][x1],args[1][x2])
         else:
             y1=(args[1][x2],args[1][x1])
-        plt.ylim(y1)            
+        plt.ylim(y1)     
+    def plotVRH(*args):
+        '''
+        func para fazer os plots de dados e coloca os limites 10%acima do colocado como utlimos parametros
+        ex:
+        dados limites em tuplas plot(*args,(xl,xu))
+        '''
+        x=args[0]**(-1/4)
+        y=np.log(args[1])
+        plt.plot(x,y,*args[2:-1])
+        plt.xlim(args[-1][1]**(-1/4),args[-1][0]**(-1/4))
+        col=args[0]
+        xmin=args[-1][0]
+        xmax=args[-1][1]
+        x1=(np.abs(args[0]-xmin)).idxmin()
+        x2=(np.abs(args[0]-xmax)).idxmin()
+        if (args[1][x1]**(-1/4))>(args[1][x2]**(-1/4)):
+            y1=(args[1][x1],args[1][x2])
+        else:
+            y1=(args[1][x2],args[1][x1])
+        plt.ylim(np.log(y1))
     
         
