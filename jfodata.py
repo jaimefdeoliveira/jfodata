@@ -237,8 +237,8 @@ class urso:
         spl = interpolate.UnivariateSpline(df[dadox], df[dadoy], k=K , s=smoothing,ext=3)
         return spl , xs
     def fit(f,x,y,limitx,plot=0):
-        
-        popt,pcov=curve_fit(f,x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])])
+        import numpy as np
+        popt,pcov=curve_fit(f,x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],bounds=(0, np.inf))
         if plot==1:
             plt.plot(x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],label='data')
             plt.plot(x[(x>limitx[0])&(x<limitx[1])],f(x[(x>limitx[0])&(x<limitx[1])],*popt),'+',label='fit')
