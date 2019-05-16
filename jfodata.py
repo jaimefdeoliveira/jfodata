@@ -175,6 +175,32 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     y = np.concatenate((firstvals, y, lastvals))
     return np.convolve( m[::-1], y, mode='valid')
 #%%
+    
+def saveQDPD(data,lista):
+    '''
+    Função para criar novos df from QD files 
+    '''
+    listanova=lista
+    
+    
+    listanova=['T (K)' if x=='Temperature (K)' else x for x in listanova]
+    listanova=['H (T)' if x=='Magnetic Field (Oe)' else x for x in listanova]
+    listanova=['R (ohms)' if x=='Bridge 1 Resistance (Ohms)' else x for x in listanova]
+    
+    df=pd.DataFrame(columns=lista)
+    
+    for i in lista:
+        df[i]=data[i]
+    
+    if lista.count('Magnetic Field (Oe)')==1:
+        df['Magnetic Field (Oe)']=data['Magnetic Field (Oe)']/10000
+    
+    df.columns=listanova
+    
+    return df
+
+
+#%%
 
 
 
