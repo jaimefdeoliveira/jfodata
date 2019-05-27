@@ -202,7 +202,15 @@ def saveQDPD(data,lista):
 
 #%%
 
-
+def desin(A,mm):
+    '''
+    A dado em ohns/tesla e mm dados em milimetros
+    resposta em cm^-3
+    '''
+    from scipy.constants import e
+    
+    return (1/(A*e*mm*10**-3))*10**-6 
+#%%
 
 
 class plot:
