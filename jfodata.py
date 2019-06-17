@@ -92,7 +92,7 @@ def saveMREDC(data,T,V,F,I):
     return df
 #%%
 
-def dfindex(df,columns,value):
+def dex(df,columns,value):
     
     'isso returna o index do row com o valor que você quer'
     import numpy as np
@@ -210,6 +210,19 @@ def desin(A,mm):
     from scipy.constants import e
     
     return (1/(A*e*mm*10**-3))*10**-6 
+
+#%%
+    
+def saveADR(data,T,H,X,Y,Vos,geo):
+    df=pd.DataFrame(columns=['T','H','R','rho','sigma','x','y'])
+    df['T']=data[T]
+    df['R']=data[X]/(Vos*10E-3)
+    df['rho']=(geo)*data[X]
+    df['sigma']=1/df['rho']
+    df['H']=(0.00291 + 0.03537*data[H])
+    df['x']=data[X]
+    df['y']=data[Y]
+    return df
 #%%
 
 
