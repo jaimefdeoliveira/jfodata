@@ -35,7 +35,8 @@ def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     função que faz a interpolção em uma faixa 
     '''
     import numpy as np
-    from scipy import interpolate 
+    from scipy import interpolate
+    import matplotlib.pyplot as plt
     data=data1
     data.sort_values(dadox,ascending=True,inplace=True)
     data.dropna(axis=1 ,how='all', inplace=True)
@@ -46,6 +47,9 @@ def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     xs=np.linspace(xmin,xmax,npoints)
     
     spl = interpolate.UnivariateSpline(data[dadox], data[dadoy], k=K , s=smoothing,ext=3)
+    
+    plt.plot(data[dadox],data[dadoy])
+    plt.plot(xs,spl(xs))
     return spl , xs
 
 
