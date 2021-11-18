@@ -48,8 +48,8 @@ def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     
     spl = interpolate.UnivariateSpline(data[dadox], data[dadoy], k=K , s=smoothing,ext=3)
     
-    plt.plot(data[dadox],data[dadoy])
-    plt.plot(xs,spl(xs))
+    #plt.plot(data[dadox],data[dadoy])
+    #plt.plot(xs,spl(xs))
     return spl , xs
 
 
@@ -178,6 +178,13 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
     y = np.concatenate((firstvals, y, lastvals))
     return np.convolve( m[::-1], y, mode='valid')
+
+#%%
+def forceAspect(ax,aspect=1):
+    im = ax.get_images()
+    extent =  im[0].get_extent()
+    ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
+
 #%%
     
 def saveQDPD(data,lista):
@@ -227,6 +234,9 @@ def saveADR(data,T,H,X,Y,Vos,geo):
     df['x']=data[X]
     df['y']=data[Y]
     return df
+#%%
+   
+
 #%%
 
 
