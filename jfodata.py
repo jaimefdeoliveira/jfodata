@@ -102,6 +102,103 @@ def dex(df,columns,value):
     import numpy as np
     return (np.abs(df[columns]-value)).idxmin()
 #%%
+def separacurvaQV(df):
+    
+    try:
+        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"]})
+        df1.dropna(inplace=True)
+        df1.reset_index(drop=True,inplace=True)
+    
+    except:
+        df1=pd.DataFrame()
+    try:
+        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"]})
+        df2.dropna(inplace=True)
+        df2.reset_index(drop=True,inplace=True)
+    except:
+        df2=pd.DataFrame()
+    return df1,df2
+
+def MRlist(df_dict,T):
+    listaMR=[]
+    for i in df_dict.keys():
+        md,ch1,ch2=data_class(df_dict[i])
+        if md==1:
+            if round(df_dict[i]['Temperature (K)'][0])==T:
+                    listaMR.append(i)
+    return listaMR
+
+def data_class(df):
+    """ Select type o data in MR, Ang scan ou RvsT
+    
+    
+    Return:
+     (mod,ch1,ch2)
+     mod:
+            0 RvsT
+            1 MR
+            2 Ang scan
+    
+    
+    
+    """
+    ch1=ch2=0
+    try:       
+        if round(df['Temperature (K)'].var())!=0:
+            mod=0
+        elif round(df['Field (Oe)'].var())!=0:
+            mod=1
+        else: 
+            mod=2
+            
+        if len(df['Resistance Ch1 (Ohms)'].dropna())!=0:
+            ch1=1
+        if len(df['Resistance Ch2 (Ohms)'].dropna())!=0:
+            ch2=1
+    except:
+        mod=3
+    return mod,ch1,ch2
+
+
+def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8):
+    import jfodata
+    
+    inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=0.01,npoints=100,K=3)
+    df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
+    for jj in range(len(inter[1])):
+        df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
+    
+    
+    
+    dfp=df[df[X]>0.1]
+    dfp=dfp.sort_values(X)
+    dfp.reset_index(drop=True,inplace=True)
+    
+    dfn=df[df[X]<-0.1]
+    dfn=dfn.sort_values(X,ascending=False)
+    dfn.reset_index(drop=True,inplace=True)
+    
+    dfnAS=(dfn[Y]-dfp[Y])/2
+    dfpAS=(dfp[Y]-dfn[Y])/2
+    
+    
+    
+    dfnSY=(dfn[Y]+dfp[Y])/2
+    dfpSY=(dfp[Y]+dfn[Y])/2
+    
+    
+    
+    dfn=dfn.assign(AS=dfnAS,SY=dfnSY)
+    dfp=dfp.assign(AS=dfpAS,SY=dfpSY)
+    dfn=dfn.dropna()
+    dfp=dfp.dropna()
+    
+    dff=pd.concat([dfn,dfp]).sort_values(X)
+    return dff.reset_index(drop=True)
+
+
+
+
 
 
 
