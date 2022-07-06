@@ -105,14 +105,14 @@ def dex(df,columns,value):
 def separacurvaQV(df):
     
     try:
-        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"]})
+        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(mA)":df['AC Current Ch1 (mA)'],"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
         df1.dropna(inplace=True)
         df1.reset_index(drop=True,inplace=True)
     
     except:
         df1=pd.DataFrame()
     try:
-        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"]})
+        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"],"I(mA)":df['AC Current Ch2 (mA)'],"f(Hz)":df['Frequency Ch2 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
         df2.dropna(inplace=True)
         df2.reset_index(drop=True,inplace=True)
     except:
@@ -163,42 +163,204 @@ def data_class(df):
 def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8):
     import jfodata
     
-    inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=0.01,npoints=100,K=3)
-    df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
-    for jj in range(len(inter[1])):
-        df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
-    
-    
-    
-    dfp=df[df[X]>0.1]
-    dfp=dfp.sort_values(X)
-    dfp.reset_index(drop=True,inplace=True)
-    
-    dfn=df[df[X]<-0.1]
-    dfn=dfn.sort_values(X,ascending=False)
-    dfn.reset_index(drop=True,inplace=True)
-    
-    dfnAS=(dfn[Y]-dfp[Y])/2
-    dfpAS=(dfp[Y]-dfn[Y])/2
-    
-    
-    
-    dfnSY=(dfn[Y]+dfp[Y])/2
-    dfpSY=(dfp[Y]+dfn[Y])/2
-    
-    
-    
-    dfn=dfn.assign(AS=dfnAS,SY=dfnSY)
-    dfp=dfp.assign(AS=dfpAS,SY=dfpSY)
-    dfn=dfn.dropna()
-    dfp=dfp.dropna()
-    
-    dff=pd.concat([dfn,dfp]).sort_values(X)
+    try:
+        Hmax=dfinit['B(T)'].max()
+        inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=0.01,npoints=100,K=3)
+        df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
+        for jj in range(len(inter[1])):
+            df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
+        
+        
+        
+        dfp=df[df[X]>0.1]
+        dfp=dfp.sort_values(X)
+        dfp.reset_index(drop=True,inplace=True)
+        
+        dfn=df[df[X]<-0.1]
+        dfn=dfn.sort_values(X,ascending=False)
+        dfn.reset_index(drop=True,inplace=True)
+        
+        dfnAS=(dfn[Y]-dfp[Y])/2
+        dfpAS=(dfp[Y]-dfn[Y])/2
+        
+        
+        
+        dfnSY=(dfn[Y]+dfp[Y])/2
+        dfpSY=(dfp[Y]+dfn[Y])/2
+        
+        
+        
+        dfn=dfn.assign(AS=dfnAS,SY=dfnSY)
+        dfp=dfp.assign(AS=dfpAS,SY=dfpSY)
+        dfn=dfn.dropna()
+        dfp=dfp.dropna()
+        
+        dff=pd.concat([dfn,dfp]).sort_values(X)
+    except:
+        dff=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
     return dff.reset_index(drop=True)
 
 
+class DataDYMRT:
+    ### Classe for plot adn analise Data for telurium projetc
+    import jfodata as jfo 
+    def __init__(self,df):
+        ''' Convert tudo para dataframe legal
+        
+        '''
+        import jfodata as jfo
+        self.mod,self.ch1,self.ch2=jfo.data_class(df)
+        self.CH1,self.CH2=jfo.separacurvaQV(df)
+        
+    def RT(self,CH=1):
+        if CH==1:
+            plt.plot(self.CH1["T(K)"],self.CH1["R(ohms)"])
+            
+        else:
+            plt.plot(self.CH2["T(K)"],self.CH2["R(ohms)"])
+            
+            
+    def MR(self,CH=1,descrip=True,label='f and I'):
+        if CH==1:
+            plt.plot(self.CH1["B(T)"],self.CH1["R(ohms)"],label=label)
+            
+        else:
+            plt.plot(self.CH2["T(K)"],self.CH2["R(ohms)"],label=label)
+        if descrip==True:
+            plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
+    def QV(self,CH=1,descrip=True,label='f and I'):
+        if CH==1:
+            plt.plot(self.CH1["B(T)"],self.CH1["4V(V)"],label=label)
+            
+        else:
+            plt.plot(self.CH2["T(K)"],self.CH2["R(ohms)"])
+        if descrip==True:
+            plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
 
+    def smartplotchart(self,descrip=True):
+        '''' 
+            Criar um chart smart do DF  com os valores de phase, In phase e QV e 4V e in phase
+            
+            Input: Dataframe 
+            
+            output fig com 4 graficos 
+        '''
+        
+        if self.mod==0:
+            Xaxis='T(K)'
+        elif self.mod==1:
+            Xaxis='B(T)'
+        else:
+            Xaxis='Angle (deg)'
+            
+            
+        if self.ch1==1:
+            data=self.CH1
+        else:
+            data=self.CH2
+        
+        fig, ax=plt.subplots(nrows=2,ncols=2,figsize=(36,36),constrained_layout=True)
+        
+        ax[0,0].plot(data[Xaxis],data['V(V)'])
+        
+        ax[0,0].set_xlabel(Xaxis)
+        ax[0,0].set_ylabel("V(V)")
+        
+        
+        ax[0,1].plot(data[Xaxis],data['4V(V)'])
+        ax[0,1].set_xlabel(Xaxis)
+        ax[0,1].set_ylabel("4V(V)")
+        
+        
+        
+        ax[1,0].plot(data[Xaxis],data['2 Harm'])
+        ax[1,0].set_xlabel(Xaxis)
+        ax[1,0].set_ylabel("2 Harm (dB)")
+        
+        
+        
+        ax[1,1].plot(data["V(V)"],data['4V(V)'])
+        ax[1,1].set_xlabel("V(V)")
+        ax[1,1].set_ylabel("4V(V)")
+        
+        if descrip==True and self.mod==1:
+            ax[0,0].annotate(r'%s:%0.2f K'%('Temperature',self.CH1["T(K)"][0]),(0.4,0.9),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f deg'%('Position',self.CH1['Angle (deg)'][0]),(0.4,0.85),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f Hz'%('Freq',self.CH1["f(Hz)"][0]),(0.4,0.80),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f mA'%('Current',self.CH1["I(mA)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
+        
+        
+        return
 
+class DataChiral(DataDYMRT):
+    
+    
+    def __init__(self,df):
+        import jfodata as jfo 
+        self.mod,self.ch1,self.ch2=jfo.data_class(df)
+        self.CH1,self.CH2=jfo.separacurvaQV(df)
+        self.CH1ASSY=jfo.ASSYextractinter(self.CH1)
+        self.CH2ASSY=jfo.ASSYextractinter(self.CH2)
+    
+    def smartplotchartSY(self,descrip=True):
+        '''' 
+            Criar um chart smart do DF  com os valores de phase, In phase e QV e 4V e in phase
+            
+            Input: Dataframe 
+            
+            output fig com 4 graficos 
+        '''
+        
+
+        if self.mod==1:
+            Xaxis='B(T)'
+        else:
+            pass 
+            
+            
+        if self.ch1==1:
+            data=self.CH1ASSY
+        else:
+            data=self.CH2ASSY
+        
+        fig, ax=plt.subplots(nrows=2,ncols=2,figsize=(36,36),constrained_layout=True)
+        
+        ax[0,0].plot(data[Xaxis],data['R(ohms)'])
+        
+        ax[0,0].set_xlabel(Xaxis)
+        ax[0,0].set_ylabel("R(ohms)")
+        
+        
+        ax[0,1].plot(data[Xaxis],data['AS'])
+        ax[0,1].set_xlabel(Xaxis)
+        ax[0,1].set_ylabel("AS")
+        
+        
+        
+        ax[1,0].plot(data[Xaxis],data['SY'])
+        ax[1,0].set_xlabel(Xaxis)
+        ax[1,0].set_ylabel("SY")
+        
+        
+        
+        ax[1,1].plot(data["SY"],data["SY"])
+        ax[1,1].set_xlabel("")
+        ax[1,1].set_ylabel("")
+        
+        if descrip==True and self.mod==1:
+            ax[0,0].annotate(r'%s:%0.2f K'%('Temperature',self.CH1["T(K)"][0]),(0.4,0.9),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f deg'%('Position',self.CH1['Angle (deg)'][0]),(0.4,0.85),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f Hz'%('Freq',self.CH1["f(Hz)"][0]),(0.4,0.80),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f mA'%('Current',self.CH1["I(mA)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
+        
+        
+        return
 
 
 
