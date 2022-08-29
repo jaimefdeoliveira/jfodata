@@ -105,14 +105,14 @@ def dex(df,columns,value):
 def separacurvaQV(df):
     
     try:
-        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(mA)":df['AC Current Ch1 (mA)'],"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
+        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(mA)":df['AC Current Ch1 (mA)'],"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
         df1.dropna(inplace=True)
         df1.reset_index(drop=True,inplace=True)
     
     except:
         df1=pd.DataFrame()
     try:
-        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':df['Field (Oe)']/10000,'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"],"I(mA)":df['AC Current Ch2 (mA)'],"f(Hz)":df['Frequency Ch2 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
+        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"],"I(mA)":df['AC Current Ch2 (mA)'],"f(Hz)":df['Frequency Ch2 (Hz)'],"2 Harm":df['2nd Harmonic Ch2 (dB)']})
         df2.dropna(inplace=True)
         df2.reset_index(drop=True,inplace=True)
     except:
@@ -211,7 +211,8 @@ class DataDYMRT:
         import jfodata as jfo
         self.mod,self.ch1,self.ch2=jfo.data_class(df)
         self.CH1,self.CH2=jfo.separacurvaQV(df)
-        
+        self.CH1.drop_duplicates(subset='B(T)',inplace=True)
+        self.CH2.drop_duplicates(subset='B(T)',inplace=True)
     def RT(self,CH=1):
         if CH==1:
             plt.plot(self.CH1["T(K)"],self.CH1["R(ohms)"])
@@ -225,7 +226,7 @@ class DataDYMRT:
             plt.plot(self.CH1["B(T)"],self.CH1["R(ohms)"],label=label)
             
         else:
-            plt.plot(self.CH2["T(K)"],self.CH2["R(ohms)"],label=label)
+            plt.plot(self.CH2["B(T)"],self.CH2["R(ohms)"],label=label)
         if descrip==True:
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
@@ -236,7 +237,7 @@ class DataDYMRT:
             plt.plot(self.CH1["B(T)"],self.CH1["4V(V)"],label=label)
             
         else:
-            plt.plot(self.CH2["T(K)"],self.CH2["R(ohms)"])
+            plt.plot(self.CH2["B(T)"],self.CH2["R(ohms)"])
         if descrip==True:
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
@@ -362,8 +363,25 @@ class DataChiral(DataDYMRT):
         
         return
 
-
-
+class QVALL(jfo.DataChiral):
+    
+    def __init__(self,df):
+        import jfodata as jfo 
+        self.mod,self.ch1,self.ch2=jfo.data_class(df)
+        self.CH1,self.CH2=jfo.separacurvaQV(df)
+        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'][0]*self.CH1['I(mA)'][0])
+        self.CH1['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'][0]*self.CH2['I(mA)'][0])
+    def QI(self,CH=1,descrip=True,label='f and I'):
+        if CH==1:
+            plt.plot(self.CH1["B(T)"],self.CH1["Indtutance"],label=label)
+            
+        else:
+            plt.plot(self.CH2["B(T)"],self.CH2["Indtutance"])
+        if descrip==True:
+            plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)    
 #%%
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
