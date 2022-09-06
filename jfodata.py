@@ -53,14 +53,15 @@ def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     return spl , xs
 
 
-def foldershow(path,ext):
+def foldershow(path,ext,Print=True):
     '''
     function to show all file to import files from an folder
     '''
     os.chdir (path)
     a= [name for name in os.listdir(".") if name.endswith("."+ ext)]
-    for i in range(len(a)):
-        print('%i %s'%(i,a[i]))
+    if Print==True:
+        for i in range(len(a)):
+            print('%i %s'%(i,a[i]))
     return a, len(a)
 
 def dataimport(path,ext,n,separador='\t',skip=1):
@@ -363,14 +364,17 @@ class DataChiral(DataDYMRT):
         
         return
 
-class QVALL(jfo.DataChiral):
+class QVALL(DataChiral):
     
     def __init__(self,df):
         import jfodata as jfo 
         self.mod,self.ch1,self.ch2=jfo.data_class(df)
         self.CH1,self.CH2=jfo.separacurvaQV(df)
-        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'][0]*self.CH1['I(mA)'][0])
-        self.CH1['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'][0]*self.CH2['I(mA)'][0])
+        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'].max()*self.CH1['I(mA)'].max())
+        self.CH2['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'].max()*self.CH2['I(mA)'].max())
+        self.dhall=1
+        self.vdis=1
+        self.croos=np.pi*(self.dhall/2)**2
     def QI(self,CH=1,descrip=True,label='f and I'):
         if CH==1:
             plt.plot(self.CH1["B(T)"],self.CH1["Indtutance"],label=label)
