@@ -32,7 +32,7 @@ os.chdir (work)
 
 def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     ''' 
-    função que faz a interpolção em uma faixa 
+    função que faz a interpolção em uA faixa 
     '''
     import numpy as np
     from scipy import interpolate
@@ -73,19 +73,19 @@ def dataimport(path,ext,n,separador='\t',skip=1):
     return pd.read_csv(a[n],sep=separador,skiprows=skip)
 
 def saveRT(data,T,R):
-    df=pd.DataFrame(columns=['T','R','rho','sigma'])
+    df=pd.DataFrame(columns=['T','R','rho','sigA'])
     df['T']=data[T]
     df['R']=data[R]
     df['rho']=(0.05/1.221)*data[R]
-    df['sigma']=1/df['rho']
+    df['sigA']=1/df['rho']
     return df
 
 def saveMR(data,T,R,F,rate):
-    df=pd.DataFrame(columns=['T','R','rho','sigma','Field'])
+    df=pd.DataFrame(columns=['T','R','rho','sigA','Field'])
     df['T']=data[T]
     df['R']=data[R]
     df['rho']=(0.05/1.221)*data[R]
-    df['sigma']=1/df['rho']
+    df['sigA']=1/df['rho']
     df['Field']=rate*data[F]
     return df
 
@@ -106,14 +106,14 @@ def dex(df,columns,value):
 def separacurvaQV(df):
     
     try:
-        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(mA)":df['AC Current Ch1 (mA)'],"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)']})
+        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(A)":df['AC Current Ch1 (mA)']/1000,"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)'],"W(rad/s)":2*np.pi*df['Frequency Ch1 (Hz)']})
         df1.dropna(inplace=True)
         df1.reset_index(drop=True,inplace=True)
     
     except:
         df1=pd.DataFrame()
     try:
-        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"],"I(mA)":df['AC Current Ch2 (mA)'],"f(Hz)":df['Frequency Ch2 (Hz)'],"2 Harm":df['2nd Harmonic Ch2 (dB)']})
+        df2=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch2 (V)'],'4V(V)':df['Quadrature Voltage Ch2 (V)'],'R(ohms)':df['Resistance Ch2 (Ohms)'],"Phase(deg)":df["Phase Angle Ch2 (deg)"],"I(A)":df['AC Current Ch2 (mA)']/1000,"f(Hz)":df['Frequency Ch2 (Hz)'],"2 Harm":df['2nd Harmonic Ch2 (dB)'],"W(rad/s)":2*np.pi*df['Frequency Ch2 (Hz)']})
         df2.dropna(inplace=True)
         df2.reset_index(drop=True,inplace=True)
     except:
@@ -161,12 +161,12 @@ def data_class(df):
     return mod,ch1,ch2
 
 
-def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8):
+def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8,K=5,smoothing=0.000000002):
     import jfodata
     
     try:
         Hmax=dfinit['B(T)'].max()
-        inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=0.01,npoints=100,K=3)
+        inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=smoothing,npoints=200,K=K)
         df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
         for jj in range(len(inter[1])):
             df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
@@ -196,7 +196,7 @@ def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8):
         dfn=dfn.dropna()
         dfp=dfp.dropna()
         
-        dff=pd.concat([dfn,dfp]).sort_values(X)
+        dff=pd.concat([dfn,dfp]).sort_values(X).astype(float)
     except:
         dff=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
     return dff.reset_index(drop=True)
@@ -232,22 +232,26 @@ class DataDYMRT:
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
-            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(A)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
+        plt.xlabel('H(T)')
+        plt.ylabel('R')
     def QV(self,CH=1,descrip=True,label='f and I'):
         if CH==1:
             plt.plot(self.CH1["B(T)"],self.CH1["4V(V)"],label=label)
             
         else:
-            plt.plot(self.CH2["B(T)"],self.CH2["R(ohms)"])
+            plt.plot(self.CH2["B(T)"],self.CH2["4V(V)"],label=label)
         if descrip==True:
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
-            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(A)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)
+        plt.xlabel('H(T)')
+        plt.ylabel('QV')
 
-    def smartplotchart(self,descrip=True):
+    def sArtplotchart(self,descrip=True):
         '''' 
-            Criar um chart smart do DF  com os valores de phase, In phase e QV e 4V e in phase
+            Criar um chart sArt do DF  com os valores de phase, In phase e QV e 4V e in phase
             
             Input: Dataframe 
             
@@ -295,7 +299,7 @@ class DataDYMRT:
             ax[0,0].annotate(r'%s:%0.2f K'%('Temperature',self.CH1["T(K)"][0]),(0.4,0.9),xycoords='axes fraction',fontsize=28)
             ax[0,0].annotate(r'%s:%0.2f deg'%('Position',self.CH1['Angle (deg)'][0]),(0.4,0.85),xycoords='axes fraction',fontsize=28)
             ax[0,0].annotate(r'%s:%0.2f Hz'%('Freq',self.CH1["f(Hz)"][0]),(0.4,0.80),xycoords='axes fraction',fontsize=28)
-            ax[0,0].annotate(r'%s:%0.2f mA'%('Current',self.CH1["I(mA)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f A'%('Current',self.CH1["I(A)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
         
         
         return
@@ -310,9 +314,9 @@ class DataChiral(DataDYMRT):
         self.CH1ASSY=jfo.ASSYextractinter(self.CH1)
         self.CH2ASSY=jfo.ASSYextractinter(self.CH2)
     
-    def smartplotchartSY(self,descrip=True):
+    def sArtplotchartSY(self,descrip=True):
         '''' 
-            Criar um chart smart do DF  com os valores de phase, In phase e QV e 4V e in phase
+            Criar um chart sArt do DF  com os valores de phase, In phase e QV e 4V e in phase
             
             Input: Dataframe 
             
@@ -359,7 +363,7 @@ class DataChiral(DataDYMRT):
             ax[0,0].annotate(r'%s:%0.2f K'%('Temperature',self.CH1["T(K)"][0]),(0.4,0.9),xycoords='axes fraction',fontsize=28)
             ax[0,0].annotate(r'%s:%0.2f deg'%('Position',self.CH1['Angle (deg)'][0]),(0.4,0.85),xycoords='axes fraction',fontsize=28)
             ax[0,0].annotate(r'%s:%0.2f Hz'%('Freq',self.CH1["f(Hz)"][0]),(0.4,0.80),xycoords='axes fraction',fontsize=28)
-            ax[0,0].annotate(r'%s:%0.2f mA'%('Current',self.CH1["I(mA)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
+            ax[0,0].annotate(r'%s:%0.2f A'%('Current',self.CH1["I(A)"][0]),(0.4,0.75),xycoords='axes fraction',fontsize=28)
         
         
         return
@@ -370,11 +374,24 @@ class QVALL(DataChiral):
         import jfodata as jfo 
         self.mod,self.ch1,self.ch2=jfo.data_class(df)
         self.CH1,self.CH2=jfo.separacurvaQV(df)
-        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'].max()*self.CH1['I(mA)'].max())
-        self.CH2['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'].max()*self.CH2['I(mA)'].max())
+        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'].max()*self.CH1['I(A)'].max())
+        self.CH2['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'].max()*self.CH2['I(A)'].max())
+        self.CH1['X']=self.CH1['4V(V)']/(self.CH1['I(A)'].max())
+        self.CH2['X']=self.CH2['4V(V)']/(self.CH2['I(A)'].max())
+       
         self.dhall=1
         self.vdis=1
         self.croos=np.pi*(self.dhall/2)**2
+        self.name='name'
+        
+        self.T=round(self.CH1['T(K)'].max(),2)
+        try:
+            self.angle=round(self.CH1['Angle (deg)'].max())
+        except:
+            self.angle=round(self.CH1['Angle (deg)'].max(),2)
+        self.I=self.CH1['I(A)'].max()
+        self.F=self.CH1['f(Hz)'].max()
+        self.W=self.CH1['W(rad/s)'].max()
     def QI(self,CH=1,descrip=True,label='f and I'):
         if CH==1:
             plt.plot(self.CH1["B(T)"],self.CH1["Indtutance"],label=label)
@@ -385,7 +402,35 @@ class QVALL(DataChiral):
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
-            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(mA)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)    
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(A)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)   
+    def SyAydataV(self):
+        from jfodata import ASSYextractinter
+        self.CH1VASSY=ASSYextractinter(self.CH1,'B(T)','V(V)',8.9)
+        self.CH2VASSY=ASSYextractinter(self.CH2,'B(T)','V(V)',8.9)
+    
+    def SyAydataQV(self):
+        from jfodata import ASSYextractinter
+        self.CH1QVASSY=ASSYextractinter(self.CH1,'B(T)','4V(V)',8.9)
+        self.CH2QVASSY=ASSYextractinter(self.CH2,'B(T)','4V(V)',8.9)
+    def SyAydataQVXLCH1(self):
+        try:       
+            self.CH1QVASSY['X']=self.CH1QVASSY['SY']/(self.CH1['I(A)'].max())
+            self.CH1QVASSY['L']=self.CH1QVASSY['SY']/(self.CH1['f(Hz)'].max()*self.CH1['I(A)'].max())
+        except:
+            pass
+        
+    def SyAydataQVXLCH2(self):    
+        try:
+            self.CH2QVASSY['X']=self.CH2QVASSY['SY']/(self.CH2['I(A)'].max())
+            self.CH2QVASSY['L']=self.CH2QVASSY['SY']/(self.CH2['f(Hz)'].max()*self.CH2['I(A)'].max())
+        except:
+            pass
+    def ASSYall(self):
+        self.SyAydataV()
+        self.SyAydataQV()
+        self.SyAydataQVXLCH1()
+        self.SyAydataQVXLCH2()
+            
 #%%
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
@@ -411,16 +456,16 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     Notes
     -----
     The Savitzky-Golay is a type of low-pass filter, particularly
-    suited for smoothing noisy data. The main idea behind this
-    approach is to make for each point a least-square fit with a
+    suited for smoothing noisy data. The Ain idea behind this
+    approach is to Ake for each point a least-square fit with a
     polynomial of high order over a odd-sized window centered at
     the point.
     Examples
     --------
     t = np.linspace(-4, 4, 500)
-    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
+    y = np.exp( -t**2 ) + np.random.norAl(0, 0.05, t.shape)
     ysg = savitzky_golay(y, window_size=31, order=4)
-    import matplotlib.pyplot as plt
+    import Atplotlib.pyplot as plt
     plt.plot(t, y, label='Noisy signal')
     plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
     plt.plot(t, ysg, 'r', label='Filtered signal')
@@ -436,7 +481,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
        Cambridge University Press ISBN-13: 9780521880688
     """
     import numpy as np
-    from math import factorial
+    from Ath import factorial
 
     try:
         window_size = np.abs(np.int(window_size))
@@ -447,11 +492,11 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     if window_size % 2 != 1 or window_size < 1:
         raise TypeError("window_size size must be a positive odd number")
     if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
+        raise TypeError("window_size is too sAll for the polynomials order")
     order_range = range(order+1)
     half_window = (window_size -1) // 2
     # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    b = np.At([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
     m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
     # pad the signal at the extremes with
     # values taken from the signal itself
@@ -462,7 +507,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
 
 #%%
 def forceAspect(ax,aspect=1):
-    im = ax.get_images()
+    im = ax.get_iAges()
     extent =  im[0].get_extent()
     ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
 
@@ -476,7 +521,7 @@ def saveQDPD(data,lista):
     
     
     listanova=['T (K)' if x=='Temperature (K)' else x for x in listanova]
-    listanova=['H (T)' if x=='Magnetic Field (Oe)' else x for x in listanova]
+    listanova=['H (T)' if x=='Agnetic Field (Oe)' else x for x in listanova]
     listanova=['R (ohms)' if x=='Bridge 1 Resistance (Ohms)' else x for x in listanova]
     
     df=pd.DataFrame(columns=lista)
@@ -484,8 +529,8 @@ def saveQDPD(data,lista):
     for i in lista:
         df[i]=data[i]
     
-    if lista.count('Magnetic Field (Oe)')==1:
-        df['Magnetic Field (Oe)']=data['Magnetic Field (Oe)']/10000
+    if lista.count('Agnetic Field (Oe)')==1:
+        df['Agnetic Field (Oe)']=data['Agnetic Field (Oe)']/10000
     
     df.columns=listanova
     
@@ -506,11 +551,11 @@ def desin(A,mm):
 #%%
     
 def saveADR(data,T,H,X,Y,Vos,geo):
-    df=pd.DataFrame(columns=['T','H','R','rho','sigma','x','y'])
+    df=pd.DataFrame(columns=['T','H','R','rho','sigA','x','y'])
     df['T']=data[T]
     df['R']=data[X]/(Vos*10E-3)
     df['rho']=(geo)*data[X]
-    df['sigma']=1/df['rho']
+    df['sigA']=1/df['rho']
     df['H']=(0.00291 + 0.03537*data[H])
     df['x']=data[X]
     df['y']=data[Y]
@@ -537,7 +582,7 @@ class plot:
         
         def nx(self,xn,dic={}):
             '''
-            função faz plots normalizados dos dados em relação a um ponto em x
+            função faz plots norAlizados dos dados em relação a um ponto em x
             '''
             yni=(np.abs(self.x-xn)).idxmin()
             plt.plot(self.x,self.y/self.y[yni],'*',**dic)
@@ -588,7 +633,7 @@ class urso:
         return popt,pcov
     def plot(*args):
         '''
-        func para fazer os plots de dados e coloca os limites 10%acima do colocado como utlimos parametros
+        func para fazer os plots de dados e coloca os limites 10%aciA do colocado como utlimos parametros
         ex:
         dados limites em tuplas plot(*args,(xl,xu))
         '''
@@ -606,7 +651,7 @@ class urso:
         plt.ylim(y1)     
     def plotVRH(*args):
         '''
-        func para fazer os plots de dados e coloca os limites 10%acima do colocado como utlimos parametros
+        func para fazer os plots de dados e coloca os limites 10%aciA do colocado como utlimos parametros
         ex:
         dados limites em tuplas plot(*args,(xl,xu))
         '''
