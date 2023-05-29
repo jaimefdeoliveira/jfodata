@@ -16,6 +16,7 @@ from scipy.optimize import curve_fit
 import numpy as np
 import math
 import pandas as pd
+import matplotlib.gridspec as gridspec
 
 plt.rcParams['axes.linewidth'] = 1.4
 plt.rcParams['figure.figsize']= (12,9)
@@ -37,19 +38,16 @@ def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
     import numpy as np
     from scipy import interpolate
     import matplotlib.pyplot as plt
-    data=data1
+    data=data1.copy()
     data.sort_values(dadox,ascending=True,inplace=True)
     data.dropna(axis=1 ,how='all', inplace=True)
     data.drop_duplicates(dadox,inplace=True)
-    
+    df=data[(data[dadox]<xmax) & (data[dadox]>xmin)] 
     
     
     xs=np.linspace(xmin,xmax,npoints)
     
-    spl = interpolate.UnivariateSpline(data[dadox], data[dadoy], k=K , s=smoothing,ext=3)
-    
-    #plt.plot(data[dadox],data[dadoy])
-    #plt.plot(xs,spl(xs))
+    spl = interpolate.UnivariateSpline(df[dadox], df[dadoy], k=K , s=smoothing,ext=3)
     return spl , xs
 
 
@@ -106,7 +104,7 @@ def dex(df,columns,value):
 def separacurvaQV(df):
     
     try:
-        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,2),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(A)":df['AC Current Ch1 (mA)']/1000,"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)'],"W(rad/s)":2*np.pi*df['Frequency Ch1 (Hz)']})
+        df1=pd.DataFrame(data={'T(K)':df['Temperature (K)'],'B(T)':round(df['Field (Oe)']/10000,4),'Angle (deg)':df['Sample Position (deg)'],'V(V)':df['In Phase Voltage Ampl Ch1 (V)'],'4V(V)':df['Quadrature Voltage Ch1 (V)'],'R(ohms)':df['Resistance Ch1 (Ohms)'],"Phase(deg)":df["Phase Angle Ch1 (deg)"],"I(A)":df['AC Current Ch1 (mA)']/1000,"f(Hz)":df['Frequency Ch1 (Hz)'],"2 Harm":df['2nd Harmonic Ch1 (dB)'],"W(rad/s)":2*np.pi*df['Frequency Ch1 (Hz)']})
         df1.dropna(inplace=True)
         df1.reset_index(drop=True,inplace=True)
     
@@ -166,18 +164,18 @@ def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8,K=5,smoothing=0.00000000
     
     try:
         Hmax=dfinit['B(T)'].max()
-        inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=smoothing,npoints=200,K=K)
+        inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=smoothing,npoints=400,K=K)
         df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
         for jj in range(len(inter[1])):
             df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
         
         
         
-        dfp=df[df[X]>0.1]
+        dfp=df[df[X]>0.01]
         dfp=dfp.sort_values(X)
         dfp.reset_index(drop=True,inplace=True)
         
-        dfn=df[df[X]<-0.1]
+        dfn=df[df[X]<-0.01]
         dfn=dfn.sort_values(X,ascending=False)
         dfn.reset_index(drop=True,inplace=True)
         
@@ -374,8 +372,8 @@ class QVALL(DataChiral):
         import jfodata as jfo 
         self.mod,self.ch1,self.ch2=jfo.data_class(df)
         self.CH1,self.CH2=jfo.separacurvaQV(df)
-        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['f(Hz)'].max()*self.CH1['I(A)'].max())
-        self.CH2['Indtutance']=self.CH2['4V(V)']/(self.CH2['f(Hz)'].max()*self.CH2['I(A)'].max())
+        self.CH1['Indtutance']=self.CH1['4V(V)']/(self.CH1['I(A)'].max())
+        self.CH2['Indtutance']=self.CH2['4V(V)']/(self.CH2['I(A)'].max())
         self.CH1['X']=self.CH1['4V(V)']/(self.CH1['I(A)'].max())
         self.CH2['X']=self.CH2['4V(V)']/(self.CH2['I(A)'].max())
        
@@ -383,8 +381,10 @@ class QVALL(DataChiral):
         self.vdis=1
         self.croos=np.pi*(self.dhall/2)**2
         self.name='name'
-        
-        self.T=round(self.CH1['T(K)'].max(),2)
+        if len(self.CH1)!=0:
+            self.T=round(self.CH1['T(K)'].max(),2)
+        else:
+            self.T=round(self.CH2['T(K)'].max(),2)
         try:
             self.angle=round(self.CH1['Angle (deg)'].max())
         except:
@@ -402,16 +402,53 @@ class QVALL(DataChiral):
             plt.annotate(r'%s:%0.2f'%('Temperaure',self.CH1["T(K)"][0]),(0.05,0.9),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('Positions',self.CH1['Angle (deg)'][0]),(0.05,0.85),xycoords='axes fraction',fontsize=18)
             plt.annotate(r'%s:%0.2f'%('freq:',self.CH1["f(Hz)"][0]),(0.05,0.80),xycoords='axes fraction',fontsize=18)
-            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(A)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)   
-    def SyAydataV(self):
+            plt.annotate(r'%s:%0.2f'%('current:',self.CH1["I(A)"][0]),(0.05,0.75),xycoords='axes fraction',fontsize=18)  
+
+        plt.xlabel('B(T)')
+        plt.ylabel('L($\Omega$)')
+    def SyAydataV(self,s=0.000000002,K=5):
+
         from jfodata import ASSYextractinter
-        self.CH1VASSY=ASSYextractinter(self.CH1,'B(T)','V(V)',8.9)
-        self.CH2VASSY=ASSYextractinter(self.CH2,'B(T)','V(V)',8.9)
+        self.CH1VASSY=ASSYextractinter(self.CH1,'B(T)','V(V)',8.9,K,s)
+        self.CH2VASSY=ASSYextractinter(self.CH2,'B(T)','V(V)',8.9,K,s)
+    def SyAydataR(self,s=0.000000002,K=5):
     
-    def SyAydataQV(self):
         from jfodata import ASSYextractinter
-        self.CH1QVASSY=ASSYextractinter(self.CH1,'B(T)','4V(V)',8.9)
-        self.CH2QVASSY=ASSYextractinter(self.CH2,'B(T)','4V(V)',8.9)
+        self.CH1VASSY=ASSYextractinter(self.CH1,'B(T)','R(ohms)',8.9,K,s)
+        self.CH2VASSY=ASSYextractinter(self.CH2,'B(T)','R(ohms)',8.9,K,s)
+    def resistivit(self):
+        from jfodata import dex
+        if len(self.CH1)!=0:
+            if self.mod==0: 
+                self.CH1rho=(self.croos*self.CH1['R(ohms)'][self.CH1['T(K)'].idxmax()])/self.vdis
+            elif self.mod==1: 
+                self.CH1rho=(self.croos*self.CH1['R(ohms)'][dex(self.CH1,'B(T)',0)])/self.vdis
+            elif self.mod==2:
+                self.CH1rho=(self.croos*self.CH1['R(ohms)'][dex(self.CH1,'Angle (deg)',0)])/self.vdis
+        else:
+            self.CH1rho=0    
+
+        if len(self.CH2)!=0:
+            if self.mod==0: 
+                self.CH2rho=(self.croos*self.CH2['R(ohms)'][self.CH2['T(K)'].idxmax()])/self.vdis
+            elif self.mod==1: 
+                self.CH2rho=(self.croos*self.CH2['R(ohms)'][dex(self.CH2,'B(T)',0)])/self.vdis
+            elif self.mod==2:
+                self.CH2rho=(self.croos*self.CH2['R(ohms)'][dex(self.CH2,'Angle (deg)',0)])/self.vdis
+        else:
+            self.CH2rho=0                  
+                
+                
+    def SyAydataQV(self,s=0.000000002,K=5):
+        from jfodata import ASSYextractinter
+        self.CH1QVASSY=ASSYextractinter(self.CH1,'B(T)','4V(V)',8.8,K,s)
+        self.CH2QVASSY=ASSYextractinter(self.CH2,'B(T)','4V(V)',8.8,K,s)
+        
+    def SyAydataX(self,s=0.000000002,K=5):
+        from jfodata import ASSYextractinter
+        self.CH1QVASSY=ASSYextractinter(self.CH1,'B(T)','X',8.8,K,s)
+        self.CH2QVASSY=ASSYextractinter(self.CH2,'B(T)','X',8.8,K,s)   
+        
     def SyAydataQVXLCH1(self):
         try:       
             self.CH1QVASSY['X']=self.CH1QVASSY['SY']/(self.CH1['I(A)'].max())
@@ -419,19 +456,1512 @@ class QVALL(DataChiral):
         except:
             pass
         
-    def SyAydataQVXLCH2(self):    
+    def SyAydataQVXLCH2(self,):    
         try:
             self.CH2QVASSY['X']=self.CH2QVASSY['SY']/(self.CH2['I(A)'].max())
             self.CH2QVASSY['L']=self.CH2QVASSY['SY']/(self.CH2['f(Hz)'].max()*self.CH2['I(A)'].max())
         except:
             pass
-    def ASSYall(self):
-        self.SyAydataV()
-        self.SyAydataQV()
+
+        
+        
+    def ASSYall(self,s=0.000000002,K=5):
+        self.SyAydataV(s,K)
+        self.SyAydataQV(s,K)
         self.SyAydataQVXLCH1()
         self.SyAydataQVXLCH2()
+        
+    def ASSYallX(self,s=0.000000002,K=5):
+        self.SyAydataR(s,K)
+        self.SyAydataX(s,K)
+        
+    def describ(self,ax,key):
+        
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfK$'%('Temperaure',self.T),(0.05,0.9),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfdeg$'%('Positions',self.angle),(0.05,0.85),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfHz$'%('freq',self.F),(0.05,0.80),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfmA$'%('current',self.I*1000),(0.05,0.75),xycoords='axes fraction',fontsize=25)     
+        
+        if round(CH[i].angle)==0:
+            ax.annotate(r'$\bf Transverse$',(0.4,1.01),xycoords='axes fraction',fontsize=22)
+        elif round(CH[i].angle)==90:
+            ax.annotate(r'$\bfLongitudinal$',(0.4,1.01),xycoords='axes fraction',fontsize=22)     
             
+    def plotRN(self,key,ax=1,desrib=1,label=''):
+        import jfodata as jfo 
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH1VASSY['B(T)'],self.CH1VASSY['SY']/self.CH1VASSY['SY'][jfo.dex(self.CH1VASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{R}{R(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+
+    def plotXN(self,key,ax=1,desrib=1,label=''):
+        import jfodata as jfo 
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH1QVASSY['B(T)'],self.CH1QVASSY['SY']/self.CH1QVASSY['SY'][jfo.dex(self.CH1QVASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{X}{X(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+
+
+
+"""
+Funcoes de classes importnte para analises
+
+
+"""
+
+from scipy.constants import epsilon_0
+from scipy.constants import mu_0
+## Analises classe
+def indutance(w,L,K,X_0):
+    return w*L + K*np.log(w) + K*X_0
+
+
+def indutanceCilindrical(w,tau,l,k3):
+    k1=1/(2*np.pi*epsilon_0)
+    k2=mu_0/(2*np.pi)
+    return np.log(w*tau)*((k1/(w*l)) - k2*l*w) + k3
+
+class  freqanasis:
+    ### Classe for data analyse and plots
+    import jfodata as jfo 
+    def __init__(self,listdf,CH):
+        self.dataXSY=pd.DataFrame(columns=['T(K)','Angle(deg)','Vcontac','croos','I(A)','f','w','B(T)','x','R','x_as','R_as'])
+        for jj in np.arange(0,9.1,0.1):
+            for i in listdf:
+                self.dataXSY.loc[len(self.dataXSY)]=[round(CH[i].T),CH[i].angle,CH[i].vdis,CH[i].croos,CH[i].I,CH[i].F,CH[i].W,jj,CH[i].CH1QVASSY['SY'][jfo.dex(CH[i].CH1QVASSY,'B(T)',jj)],CH[i].CH1VASSY['SY'][jfo.dex(CH[i].CH1VASSY,'B(T)',jj)],CH[i].CH1QVASSY['AS'][jfo.dex(CH[i].CH1QVASSY,'B(T)',jj)],CH[i].CH1VASSY['AS'][jfo.dex(CH[i].CH1VASSY,'B(T)',jj)]]
+    def dffilter(self,B=0,Ang=0,fcut=0,fundercut=200,I=0.1e-3,label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        return df
+    def plotQVW(self,B=0,Ang=0,fundercut=200,fcut=0,I=0.1e-3,label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        plt.plot(df["w"],df["x"]/df["w"],'-o',label=label)
+        
+        
+    def plotZ(self,B=0,Ang=0,fundercut=200,fcut=0,T=2,I=0.1e-4,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I) & (self.dataXSY["T(K)"]==T)]
+        plt.plot(df[xaxis],df["x"],'-o',label=label,ms=10,lw=4)
+        
+    def plotZAS(self,B=0,Ang=0,fundercut=200,fcut=0,T=2,I=0.1e-4,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I) & (self.dataXSY["T(K)"]==T)]
+        plt.plot(df[xaxis],df["x_as"],'-o',label=label,ms=10,lw=4)
+
+    def plotZnormal(self,B=0,Ang=0,fundercut=200,fcut=0,I=0.1e-4,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        plt.plot(df[xaxis],df["x"]/df["x"][jfo.dex(df,"w",0)],'-o',label=label,ms=10,lw=4)
+        
+    def plotZR(self,B=0,Ang=0,fundercut=200,fcut=0,T=2,I=0.1e-4,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I) & (self.dataXSY["T(K)"]==T)]
+        plt.plot(df[xaxis],df["R"],'-o',label=label,ms=10,lw=4)
+        
+    def plotZRAS(self,B=0,Ang=0,fundercut=200,fcut=0,T=2,I=0.1e-4,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I) & (self.dataXSY["T(K)"]==T)]
+        plt.plot(df[xaxis],df["R_as"],'-o',label=label,ms=10,lw=4)
+        
+    def fitLiner(self,B=0,Ang=0,fcut1=0,fcut=0,label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) ]
+        df1=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut1) ]
+
+        plt.plot(df1["w"],df1["x"],'o',label=label)
+        poly=np.polyfit(df["w"],df["x"],1)
+        plt.plot(df["w"],np.polyval(poly,df["w"]),'-r')
+
+        return poly
+    
+    
+    def fitunderL(self,func,B=0,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        df1=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut1) ]
+
+        plt.plot(df1["w"],df1["x"],'-o',label=label,ms=10,lw=4)
+        popt,pcov=curve_fit(func,df["w"],df["x"])
+        plt.plot(df["w"],func(df["w"],*popt),'r')
+
+        return popt
+    
+    def fitunderL2(self,B=0,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        df1=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut1) ]
+
+        plt.plot(df1["w"],df1["x"],'-o',label=label,ms=10,lw=4)
+        popt,pcov=curve_fit(indutanceCilindrical,df["w"],df["x"])
+        plt.plot(df["w"],indutanceCilindrical(df["w"],*popt),'r')
+
+        return popt
+    
+    
+    def fitunderLDF(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):
+        coeffi=pd.DataFrame(columns=['B(T)','L','K','X_0'])
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            df1=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut1) ]
+    
+            
+            popt,pcov=curve_fit(indutance,df["w"],df["x"])
+            
+            coeffi.loc[len(coeffi)]=[jj,popt[0],popt[1],popt[2]]
+        self.coeffi=coeffi
+        return coeffi
+    
+    def fitLinerDf(self,Ang=0,fcut1=0,fcut=0,label='OI'):
+        
+        X0LB=pd.DataFrame(columns=['T(K)','Angle(deg)','B(T)','Vcontac','croos','I(A)','f','w','X_0','L_B',])
+        for jj in np.arange(0,9.1,0.1):
+            
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut)]
+            self.poly=np.polyfit(df["w"],df["x"],1)
+            X0LB.loc[len(X0LB)]=[2,Ang,jj,CH[i].vdis,CH[i].croos,CH[i].I,CH[i].F,CH[i].W,self.poly[1],self.poly[0]]
+            
+        self.X0LB=X0LB
+        return  X0LB
+
+    def plotPuroC(self,B=0,Ang=0,fundercut=200,fcut=0,I=0.1e-3,xaxis="w",label='OI'):
+        df=self.dataXSY[(self.dataXSY["B(T)"]==B) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+        plt.plot(df[xaxis],df["x"]-self.X0LB['X_0'][jfo.dex(self.X0LB,"B(T)",B)]-(df[xaxis]*self.X0LB['L_B'][jfo.dex(self.X0LB,"B(T)",B)]),'-o',label=label,ms=10,lw=4)
+
+        
+    def lmfitodel0(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutancPower(w,alpha,beta,x_0):
+            
+            return alpha*(w) - 1/(beta*(w)) + x_0
+        ind=Model(indutancPower)
+        dfT=pd.DataFrame(columns=['L', 'K', 'X_0'])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            params = ind.make_params(alpha=1,beta=1,x_0=1)
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dfT.loc[jj]=fitmodel.values
+        return fitmodel,dfT        
+
+        
+    def lmfitodel(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutance(w,L,K,X_0):
+            return w*L + K*np.log(w) + X_0
+        ind=Model(indutance)
+        dfT=pd.DataFrame(columns=['L', 'K', 'X_0'])
+        fitmodel={}
+      
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            params = ind.make_params(L=-1.4,K=60,X_0=1.5)
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dfT.loc[jj]=fitmodel.values
+        return fitmodel,dfT
+    
+
+  
+    def lmfitodel2(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutanceCilindrical(w,tau,l):
+            k1=1/(2*np.pi*epsilon_0)
+            k2=mu_0/(2*np.pi)
+            return np.log(w*tau)*((k1/(w*l)) - k2*l*w)
+        ind=Model(indutanceCilindrical)
+        dfT=pd.DataFrame(columns=['tau', 'l'])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            params = ind.make_params(tau=1,l=0.001)
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dfT.loc[jj]=fitmodel.values
+        return fitmodel,dfT
+    
+    def lmfitodel3(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutanceCilindrical(w,tau,l):
+            k1=1/(2*np.pi*epsilon_0)
+            k2=mu_0/(2*np.pi)
+            return np.log(w*tau)*((k1/(w*l)) - k2*l*w)
+        ind=Model(indutanceCilindrical)
+        dfT=pd.DataFrame(columns=['tau', 'l'])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            params = ind.make_params(tau=1,l=0.001)
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dfT.loc[jj]=fitmodel.values
+        return fitmodel,dfT
+    
+  
+    def lmfitodel4(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutancPower(w,alpha,beta,a,b):
+            
+            
+            return alpha*(w**a) - beta*(w**b)
+        ind=Model(indutancPower)
+        dfT=pd.DataFrame(columns=['B(T)',"alpha","beta","a","b"])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            #popt,pcov=curve_fit(indutancPower,df['w'],df['x'],maxfev = 50000)
+            params = ind.make_params(alpha=1,beta=1,a=1/3,b=1)
+            params['b'].vary=False
+            params['a'].vary=False
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dic=fitmodel[jj].values 
+            dic['B(T)']=jj
+            dfT.loc[jj]=dic
+            
+        return fitmodel,dfT
+
+    def lmfitodelunder(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutancPower(w,L,W_0):
+            
+            
+            return w*L/(1+((w**2)/(W_0**2)))
+        ind=Model(indutancPower)
+        dfT=pd.DataFrame(columns=['B(T)',"L","W_0"])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            #popt,pcov=curve_fit(indutancPower,df['w'],df['x'],maxfev = 50000)
+            params = ind.make_params(L=1,W_0=1)
+
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dic=fitmodel[jj].values 
+            dic['B(T)']=jj
+            dfT.loc[jj]=dic
+            
+        return fitmodel,dfT
+    
+    
+    def lmfitCarste1(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutancPower(w,L,W_0):
+            
+            
+            return w*L/(1+((w**2)*(W_0**2)))
+        ind=Model(indutancPower)
+        dfT=pd.DataFrame(columns=['B(T)',"L","W_0"])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            #popt,pcov=curve_fit(indutancPower,df['w'],df['x'],maxfev = 50000)
+            params = ind.make_params(L=1,W_0=1)
+
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dic=fitmodel[jj].values 
+            dic['B(T)']=jj
+            dfT.loc[jj]=dic
+            
+        return fitmodel,dfT
+
+    def lmfitmodes(self,Ang=0,fundercut=200,fcut1=0,fcut=0,label='OI',I=0.1e-3):   
+        def indutancmodes(w,F_n,rho,alpha):
+            
+            
+            return w*F_n/(1+((rho*F_n*w)**(2*alpha)))
+        
+        ind=Model(indutancmodes,prefix="1")
+        ind2=Model(indutancmodes,prefix="2")
+        dfT=pd.DataFrame(columns=['B(T)',"F_n","rho","alpha"])
+        fitmodel={}
+        for jj in np.arange(0,9.1,0.1):
+            df=self.dataXSY[(self.dataXSY["B(T)"]==jj) & (self.dataXSY["Angle(deg)"]==Ang) & (self.dataXSY["f"]>fcut) & (self.dataXSY["f"]<fundercut) & (self.dataXSY["I(A)"]==I)]
+            #popt,pcov=curve_fit(indutancPower,df['w'],df['x'],maxfev = 50000)
+            params = ind.make_params(rho=0.04857153,F_n=0.92808498,alpha=0.8)
+
+            fitmodel[jj]=ind.fit(df['x'],params=params,w=df['w'])
+            dic=fitmodel[jj].values 
+            dic['B(T)']=jj
+            dfT.loc[jj]=dic
+            
+        return fitmodel,dfT
+        
+class plot2dnharmoci:
+
+    def __init__(self,CH):
+
+        self.CH=CH
+        
+    def describ(self,ax,key):
+        
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfK$'%('Temperaure',self.CH[key].T),(0.05,0.9),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfdeg$'%('Positions',self.CH[key].angle),(0.05,0.85),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfHz$'%('freq',self.CH[key].F),(0.05,0.80),xycoords='axes fraction',fontsize=25)
+        ax.annotate(r'$\bf{%s:%0.2f}$ $\bfmA$'%('current',self.CH[key].I*1000),(0.05,0.75),xycoords='axes fraction',fontsize=25)     
+        
+        if round(CH[i].angle)==0:
+            ax.annotate(r'$\bf Transverse$',(0.4,1.01),xycoords='axes fraction',fontsize=22)
+        elif round(CH[i].angle)==90:
+            ax.annotate(r'$\bfLongitudinal$',(0.4,1.01),xycoords='axes fraction',fontsize=22)
+        
+    def realdataR(self,key,ax=1,desrib=1):
+        if ax==1:
+            fig, ax = plt.subplots()
+            
+        ax.plot(self.CH[key].CH1['B(T)'],self.CH[key].CH1['R(ohms)'],'ok',label='Data')
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['R(ohms)'],'--r',lw=4,label='Data interpolate')
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['SY'],'g--',lw=4,label='Data interpolate SY part')  
+        #ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1VASSY['AS'],'b--')  
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$R(\Omega)$')
+        if desrib==1:
+            self.describ(ax,key)
+        ax.legend(fontsize=18,loc='lower left')
+        
+    def realdataX(self,key,ax=1,desrib=1):
+        if ax==1:
+            fig, ax = plt.subplots()
+            
+        ax.plot(self.CH[key].CH1['B(T)'],self.CH[key].CH1['X'],'ok',label='Data')
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['X'],'--r',lw=4,label='Data interpolate')
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['SY'],'g--',lw=4,label='Data interpolate SY part')  
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['AS'],'b--',label='Data interpolate AS part')  
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$X(\Omega)$')
+        if desrib==1:
+            self.describ(ax,key)
+        ax.legend(fontsize=18,loc='lower left')
+        
+        
+    def plotX(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['SY'],'o',label=label)     
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$X(\Omega)$')
+        if desrib==1:
+            self.describ(ax,key)
+        
+        
+
+    def plotR(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        print(key)
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['SY'],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'R($\Omega$)')
+        if desrib==1:
+            self.describ(ax,key)
+           
+        
+    def plot2nd(self,key,ax=1,desrib=1,label='',**kwargs):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1['B(T)'],self.CH[key].CH1['2 Harm'],'o',label=label,**kwargs)        
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'2 Harmic (Db)')
+        if desrib==1:
+            self.describ(ax,key)
+        
+        
+    def plotRdiff(self,key,ax=1,desrib=1,label='',**kwargs):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'][:-1],np.diff(self.CH[key].CH1VASSY['SY']),'o',label=label,**kwargs) 
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{dR}{dB}$')
+        if desrib==1:
+            self.describ(ax,key)
+            
+       
+        
+    def plotXdiff(self,key,ax=1,desrib=1,label='',**kwargs):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'][:-1],np.diff(self.CH[key].CH1QVASSY['SY']),'o',label=label,**kwargs) 
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{dX}{dB}$')
+        if desrib==1:
+            self.describ(ax,key)
+        
+    def plot2nddiff(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1['B(T)'][:-1],np.diff(self.CH[key].CH1['2 Harm']),'o',label=label) 
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{d 2andH}{dB}$')
+        if desrib==1:
+            self.describ(ax,key)
+        
+    def tresfig3(self,key,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.3,hspace=.30)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+
+        
+      
+        
+        
+        self.plotR(key,ax0)
+        self.plotX(key,ax1,desrib=0)
+        self.plot2nd(key,ax2,desrib=0)
+        
+        self.plotRdiff(key,ax3,desrib=0)
+        self.plotXdiff(key,ax4,desrib=0)
+        self.plot2nddiff(key,ax5,desrib=0)
+        
+        
+        
+        plt.savefig(path + '\%s_T_%0.2f_K_ang_%0.2f_deg.jpg'%(key,self.CH[key].T,self.CH[key].angle))
+        plt.show()
+        
+        
+    def tresfig4(self,key,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,36))
+        gs0 = gridspec.GridSpec(3, 3, figure=fig,wspace=0.3,hspace=.30)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+
+
+        ax6=fig.add_subplot(gs0[2,0])
+        ax7=fig.add_subplot(gs0[2,1])
+        ax8=fig.add_subplot(gs0[2,2])
+      
+        
+        self.realdataR(key,ax0)
+        self.realdataX(key,ax1,desrib=0)
+        
+        
+        self.plotR(key,ax3,desrib=0)
+        self.plotX(key,ax4,desrib=0)
+        self.plot2nd(key,ax5,desrib=0)
+        
+        self.plotRdiff(key,ax6,desrib=0)
+        self.plotXdiff(key,ax7,desrib=0)
+        self.plot2nddiff(key,ax8,desrib=0)
+        
+
+        
+        plt.savefig(path + '\%s_T_%0.2f_K_ang_%0.2f_deg.jpg'%(key,self.CH[key].T,self.CH[key].angle))
+        plt.show()
+        
+    def diffchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].angle==0 and CH[i].I==0.0001:
+                self.plotRdiff(i,ax0,desrib=0,label='%0.2f'%CH[i].F) 
+                ax0.set_title('Transversal')
+                ax0.legend()
+        for i in listdf:
+            if CH[i].angle==90 and CH[i].I==0.0001:
+                self.plotRdiff(i,ax1,desrib=0) 
+                ax1.set_title('logitudinal')
+            
+        for i in listdf:
+            if CH[i].angle==0 and  CH[i].I==0.0001:
+                self.plotXdiff(i,ax2,desrib=0) 
+                
+        for i in listdf:
+            if CH[i].angle==90 and CH[i].I==0.0001:
+                self.plotXdiff(i,ax3,desrib=0) 
+                
+    def RXchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].angle==0 and  CH[i].I==0.0001:
+                self.plotR(i,ax0,desrib=0,label='%0.2f'%CH[i].F) 
+                ax0.set_title('Transversal')
+                ax0.legend()
+        for i in listdf:
+            if CH[i].angle==90 and  CH[i].I==0.0001:
+                self.plotR(i,ax1,desrib=0) 
+                ax1.set_title('logitudinal')
+            
+        for i in listdf:
+            if CH[i].angle==0 and  CH[i].I==0.0001:
+                self.plotX(i,ax2,desrib=0) 
+                
+        for i in listdf:
+            if CH[i].angle==90 and  CH[i].I==0.0001:
+                self.plotX(i,ax3,desrib=0) 
+                
+                
+    def Ichart(self,listdf,angle=0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+        
+        Ilist=list(set([self.CH[i].I for i in listdf]))
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].I:
+                self.plotR(i,ax0,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax0.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax0.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend()
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].I:
+                self.plotR(i,ax1,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax1.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax1.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax1.legend()
+
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].I:
+                self.plotR(i,ax2,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax2.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax2.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax2.legend()
+
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].I:
+                self.plotX(i,ax3,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax3.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax3.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend()      
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].I:
+                self.plotX(i,ax4,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax4.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax4.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend() 
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].I:
+                self.plotX(i,ax5,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax5.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax5.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend() 
+                
+    def Idrchart(self,listdf,angle=0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+        
+        Ilist=list(set([self.CH[i].I for i in listdf]))
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].I:
+                self.plotRdiff(i,ax0,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax0.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax0.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend()
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].I:
+                self.plotRdiff(i,ax1,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax1.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax1.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax1.legend()
+
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].I:
+                self.plotRdiff(i,ax2,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax2.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax2.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax2.legend()
+
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].I:
+                self.plotXdiff(i,ax3,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax3.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax3.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend()      
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].I:
+                self.plotXdiff(i,ax4,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax4.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax4.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend() 
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].I:
+                self.plotXdiff(i,ax5,desrib=0,label='%0.2f'%CH[i].F) 
+                if angle==0:
+                    ax5.set_title('Transversel I=%0.2f mA'%(CH[i].I*1000))
+                else:
+                    ax5.set_title('Longitudinal I=%0.2f mA'%(CH[i].I*1000))
+                ax0.legend() 
+                
+    def Fchart(self,listdf,angle=0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+        
+        Ilist=list(set([self.CH[i].F for i in listdf]))
+        Ilist=sorted(Ilist)
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].F:
+                self.plotR(i,ax0,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax0.set_title('Transversel F=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax0.set_title('Longitudinal F=%0.2f Hz'%(CH[i].F))
+                ax0.legend()
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].F:
+                self.plotR(i,ax1,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax1.set_title('Transversel F=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax1.set_title('Longitudinal F=%0.2f Hz'%(CH[i].F))
+                ax1.legend()
+
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].F:
+                self.plotR(i,ax2,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax2.set_title('Transversel F=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax2.set_title('Longitudinal F=%0.2f Hz'%(CH[i].F))
+                ax2.legend()
+
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].F:
+                self.plotX(i,ax3,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax3.set_title('Transversel F=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax3.set_title('Longitudinal F=%0.2f Hz'%(CH[i].F))
+                ax0.legend()      
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].F:
+                self.plotX(i,ax4,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax4.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax4.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax0.legend() 
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].F:
+                self.plotX(i,ax5,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax5.set_title('Transversel F=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax5.set_title('Longitudinal F=%0.2f Hz'%(CH[i].F))
+                ax0.legend() 
+                
+                
+    def Fdchart(self,listdf,angle=0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+        
+        Ilist=list(set([self.CH[i].F for i in listdf]))
+        Ilist=sorted(Ilist)
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].F:
+                self.plotRdiff(i,ax0,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax0.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax0.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax0.legend()
+        
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].F:
+                self.plotRdiff(i,ax1,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax1.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax1.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax1.legend()
+
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].F:
+                self.plotRdiff(i,ax2,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax2.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax2.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax2.legend()
+
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[0]==CH[i].F:
+                self.plotXdiff(i,ax3,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax3.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax3.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax0.legend()      
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[1]==CH[i].F:
+                self.plotXdiff(i,ax4,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax4.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax4.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax0.legend() 
+                
+        for i in listdf:
+            if CH[i].angle==angle and Ilist[2]==CH[i].F:
+                self.plotXdiff(i,ax5,desrib=0,label='%0.2f'%(CH[i].I*1000)) 
+                if angle==0:
+                    ax5.set_title('Transversel I=%0.2f Hz'%(CH[i].F))
+                else:
+                    ax5.set_title('Longitudinal I=%0.2f Hz'%(CH[i].F))
+                ax0.legend() 
+                
+                
+    def Fanglechart(self,listdf,angle=0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):    
+        fig = plt.figure(figsize=(36,24))
+        gs0 = gridspec.GridSpec(2, 3, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[0,2])
+        ax3=fig.add_subplot(gs0[1,0])
+        ax4=fig.add_subplot(gs0[1,1])
+        ax5=fig.add_subplot(gs0[1,2])
+        
+        Ilist=list(set([self.CH[i].F for i in listdf]))
+        Ilist=sorted(Ilist)
+        
+        
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[0]==CH[i].F:
+                self.plotRdiff(i,ax0,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[0]==CH[i].F:
+                self.plotRdiff(i,ax0,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax0.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[1]==CH[i].F:
+                self.plotRdiff(i,ax1,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[1]==CH[i].F:
+                self.plotRdiff(i,ax1,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax0.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[2]==CH[i].F:
+                self.plotRdiff(i,ax2,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[2]==CH[i].F:
+                self.plotRdiff(i,ax2,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax0.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[0]==CH[i].F:
+                self.plotRdiff(i,ax0,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[0]==CH[i].F:
+                self.plotRdiff(i,ax0,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax0.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[1]==CH[i].F:
+                self.plotRdiff(i,ax1,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[1]==CH[i].F:
+                self.plotRdiff(i,ax1,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax1.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[2]==CH[i].F:
+                self.plotRdiff(i,ax2,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[2]==CH[i].F:
+                self.plotRdiff(i,ax2,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax3.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[0]==CH[i].F:
+                self.plotXdiff(i,ax3,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[0]==CH[i].F:
+                self.plotXdiff(i,ax3,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax3.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[1]==CH[i].F:
+                self.plotXdiff(i,ax4,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[1]==CH[i].F:
+                self.plotXdiff(i,ax5,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax4.set_title('F=%0.2f Hz'%(CH[i].F))
+                
+        for i in listdf:
+            if CH[i].angle==0 and Ilist[2]==CH[i].F:
+                self.plotXdiff(i,ax5,desrib=0,color='red',label='%0.2f'%(CH[i].I*1000)) 
+            if CH[i].angle==90 and Ilist[2]==CH[i].F:
+                self.plotXdiff(i,ax5,desrib=0,color='black',label='%0.2f'%(CH[i].I*1000)) 
+                ax5.set_title('F=%0.2f Hz'%(CH[i].F))
+
+class Datafit:
+    ### Classe for data analyse and fit quadrature voltage and save the data.
+    import jfodata as jfo 
+    def __init__(self,listdf,CH):
+        self.df={}
+        self.intparam={}
+        self.inter={}
+        for i in listdf:
+            self.df[i]=CH[i].CH1
+        self.listdf=listdf
+        for i in listdf:
+            self.df[i]=CH[i].CH1
+        for i in listdf:
+            self.intparam[i]=[1,3]
+    
+    def plotX(self,key,ax=1):
+        if ax==1:
+            fig, ax = plt.subplots()
+        
+        ax.plot(self.df[key]['B(T)'],self.df[key]['X'],'ok')
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel('X($\Omega$)')
+        
+    def plotR(self,key,ax=1):
+        if ax==1:
+            fig, ax = plt.subplots()
+        
+        ax.plot(self.df[key]['B(T)'],self.df[key]['R(ohms)'],'ok')
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel('R($\Omega$)')
+        
+    def interpo(self,key,s=1,K=3,Y='X'):
+        Hmax=self.df[key]['B(T)'].max()
+        self.inter[key]=jfo.pdinter(self.df[key],'B(T)',Y,-Hmax,Hmax,npoints=200,smoothing=s,K=K)
+        self.intparam[i]=[s,K]
+    def plotinter(self,key,ax=1):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.inter[key][1],self.inter[key][0](self.inter[key][1]),'-.r')
+        
+    def interfinal(self,key,s=1,K=3):
+        fig, ax = plt.subplots()
+        self.interpo(key,s,K)
+        self.plotX(key,ax)
+        self.plotinter(key,ax)
+        plt.show()
+    
+    def datasave(self,path):
+        np.save(path+'\intparam.npy',self.intparam)
+        
+    def dataload(self,path):
+        self.intparam=np.load(path+'\intparam.npy',allow_pickle='TRUE').item()     
+
+class Analiperpara(plot2dnharmoci):
+    import matplotlib.gridspec as gridspec
+    def __init__(self,CH):
+
+        self.CH=CH
+        
+    def plotRN(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['SY']/self.CH[key].CH1VASSY['SY'][jfo.dex(self.CH[key].CH1VASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{R}{R(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+
+    def plotRNAS(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['AS']/self.CH[key].CH1VASSY['AS'][jfo.dex(self.CH[key].CH1VASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{R_AS}{R(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+    
+    def plotRAS(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1VASSY['B(T)'],self.CH[key].CH1VASSY['AS'],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{R_AS}{R(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)            
+            
+    def plotXN(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['SY']/self.CH[key].CH1QVASSY['SY'][jfo.dex(self.CH[key].CH1QVASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{X}{X(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+            
+            
+    def plotXNAS(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['AS']/self.CH[key].CH1QVASSY['AS'][jfo.dex(self.CH[key].CH1QVASSY,'B(T)',0)],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{X_AS}{X(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+    def plotXAS(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1QVASSY['AS'],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{X_AS}{X(B=0T)}$')
+        if desrib==1:
+            self.describ(ax,key)
+            
+    def plotNRdiff(self,key,ax=1,desrib=1,label='',**kwargs):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'][:-1],np.diff(self.CH[key].CH1VASSY['SY']/self.CH[key].CH1VASSY['SY'][jfo.dex(self.CH[key].CH1VASSY,'B(T)',0)]),'o',label=label,**kwargs) 
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{d(R/R(B=0))}{dB}$')
+        if desrib==1:
+            self.describ(ax,key) 
+            
+    def plotNXdiff(self,key,ax=1,desrib=1,label='',**kwargs):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'][:-1],np.diff(self.CH[key].CH1QVASSY['SY']/self.CH[key].CH1QVASSY['SY'][jfo.dex(self.CH[key].CH1QVASSY,'B(T)',0)]),'o',label=label,**kwargs) 
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'$\frac{d(X/X(B=0))}{dB}$')
+        if desrib==1:
+            self.describ(ax,key)
+            
+    def plotRexp(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1VASSY['SY'],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'R($\Omega$)')
+        if desrib==1:
+            self.describ(ax,key)  
+            
+    def paraperpRX(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):            
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotR(i,ax0,desrib=1,label=CH[i].name) 
+                ax0.set_title('Transversal')
+                       
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotR(i,ax1,desrib=0,label=CH[i].name) 
+                ax1.set_title('logitudinal')    
+                
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotX(i,ax2,desrib=1) 
+                ax0.set_title('Transversal')
+              
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotX(i,ax3,desrib=0,label=CH[i].name) 
+                ax1.set_title('logitudinal')   
+        ax1.legend(markerscale=2,frameon=False)
+            
+    def paraperp(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotRN(i,ax0,desrib=1) 
+                ax0.set_title('Transversal')
+                ax0.legend()
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotRN(i,ax1,desrib=0,label=CH[i].name) 
+                ax1.set_title('logitudinal')
+        ax1.legend()    
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotRdiff(i,ax2,desrib=0) 
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotRdiff(i,ax3,desrib=0)
+                
+                
+    def paraperpX(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotXN(i,ax0,desrib=1) 
+                ax0.set_title('Transversal')
+                ax0.legend()
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotXN(i,ax1,desrib=0,label=CH[i].name) 
+                ax1.set_title('logitudinal')
+        ax1.legend()    
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==0 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotXdiff(i,ax2,desrib=0) 
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].angle==90 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotXdiff(i,ax3,desrib=0) 
+        ax1.legend(markerscale=2,frameon=False)       
+                
+    def roda(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotR(i,ax0,desrib=1) 
+                
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotX(i,ax1,desrib=0,label='%0.2f deg'%CH[i].angle) 
+              
+        ax1.legend(markerscale=2)    
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotRdiff(i,ax2,desrib=0) 
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2:
+                self.plotXdiff(i,ax3,desrib=0)
+    def subtrairR(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1VASSY
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1VASSY
+            ax.plot(df0['B(T)'],df0['SY']-df90["SY"])
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('R$_\perp$ - R$_\parallel$ ')
+            
+    def subtrairX(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1QVASSY
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1QVASSY
+            ax.plot(df0['B(T)'],df0['SY']-df90["SY"])
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('X$_\perp$ - X$_\parallel$ ')
+         
+            
+    def subtrairdR(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()        
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1VASSY
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1VASSY
+                    
+            ax.plot(df0['B(T)'][:-1],np.diff(df0['SY']-df90['SY']),label=jj)
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('dR$_\perp$ - dR$_\parallel$ ')
+    
+    def subtrairdR(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()        
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1VASSY
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1VASSY
+                    
+            ax.plot(df0['B(T)'][:-1],np.diff(df0['SY']-df90['SY']),label=jj)
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('dR$_\perp$ - dR$_\parallel$ ')
+
+    def plotRlinearlog(self,key,ax=1,desrib=1,label=''):
+        if ax==1:
+            fig, ax = plt.subplots()
+        ax.plot(self.CH[key].CH1QVASSY['B(T)'],self.CH[key].CH1VASSY['SY'],'o',label=label)            
+        ax.set_xlabel('B(T)')
+        ax.set_ylabel(r'R($\Omega$)')
+        if desrib==1:
+            self.describ(ax,key)
+          
+
+    def subtrainrdX(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1QVASSY
+                    
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1QVASSY
+                    
+            ax.plot(df0['B(T)'][:-1],np.diff(df0['SY']/df0["SY"][jfo.dex(df0,"SY",0)]-df90['SY']/df90["SY"][jfo.dex(df90,"SY",0)]),label=jj)
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('X$_\perp$ - X$_\parallel$ ')
+            
+    def subtrainrdR(self,listdf,ax=1):
+        Names=list(set([CH[i].name for i in listdf]))
+        if ax==1:
+            fig, ax = plt.subplots()        
+        for jj in Names:
+            for i in listdf:
+                if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0 and CH[i].name==jj:
+                    df0=self.CH[i].CH1VASSY
+                elif CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90 and CH[i].name==jj:
+                    df90=self.CH[i].CH1VASSY
+                    
+            ax.plot(df0['B(T)'][:-1],np.diff(df0['SY']/df0["SY"][jfo.dex(df0,"SY",0)]-df90['SY']/df90["SY"][jfo.dex(df90,"SY",0)]),label=jj)
+            ax.set_xlabel('B(T)')
+            ax.set_ylabel('R$_\perp$ - R$_\parallel$ ')
+            
+            
+    def subtrairRchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotRN(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')        
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotRN(i,ax1,desrib=0,label=CH[i].name) 
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)    
+
+        self.subtrairR(listdf,ax2) 
+        
+    def subtrairdRchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotRdiff(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')                    
+            
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotRdiff(i,ax1,desrib=0,label=CH[i].name) 
+              
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)          
+
+        self.subtrairdR(listdf,ax2) 
+
+        
+    def subtrairXchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotXN(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')        
+                
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotXN(i,ax1,desrib=0,label=CH[i].name) 
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)    
+
+        self.subtrairX(listdf,ax2) 
+
+        
+    def subtrairdXchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotXdiff(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')                    
+            
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotXdiff(i,ax1,desrib=0,label=CH[i].name) 
+              
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)          
+
+        self.subtrairdX(listdf,ax2) 
+        
+        
+    def subtrairdNRchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotNRdiff(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')                    
+            
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotNRdiff(i,ax1,desrib=0,label=CH[i].name) 
+              
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)          
+
+        self.subtrainrdR(listdf,ax2) 
+        
+    def subtrairdNXchart(self,listdf,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,12))
+        gs0 = gridspec.GridSpec(1, 3, figure=fig,wspace=0.25,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0])
+        ax1=fig.add_subplot(gs0[1])
+        ax2=fig.add_subplot(gs0[2])
+        
+        
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==0:
+                self.plotNXdiff(i,ax0,desrib=1) 
+        ax0.set_title('Transversal')                    
+            
+        for i in listdf:
+            if CH[i].I==0.0001 and CH[i].F==70.19043 and round(CH[i].T)==2 and CH[i].angle==90:
+                self.plotNXdiff(i,ax1,desrib=0,label=CH[i].name) 
+              
+        ax1.set_title('logitudinal')      
+        ax1.legend(markerscale=2,frameon=False)          
+
+        self.subtrainrdX(listdf,ax2) 
+        
+        
+    def paraperp23(self,listdf0,listdf90,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf0:
+            
+            self.plotRN(i,ax0,desrib=0) 
+       
+            
+        for i in listdf90:
+            
+            self.plotRN(i,ax1,desrib=0,label="%0.2f Hz"%CH[i].F) 
+        ax1.set_title('logitudinal')
+        ax1.legend()    
+        for i in listdf0:
+            
+            self.plotRdiff(i,ax2,desrib=0) 
+                
+        for i in listdf90:
+            
+            self.plotRdiff(i,ax3,desrib=0)
+            
+        ax0.set_title('Transversal T=%i K'%CH[i].T)    
+        ax1.set_title('logitudinal T=%i K'%CH[i].T)    
+        
+        
+    def paraperp23X(self,listdf0,listdf90,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf0:
+            
+            self.plotXN(i,ax0,desrib=0) 
+       
+            
+        for i in listdf90:
+            
+            self.plotXN(i,ax1,desrib=0,label="%0.2f Hz"%CH[i].F) 
+        ax1.set_title('logitudinal')
+        ax1.legend()    
+        for i in listdf0:
+            
+            self.plotXdiff(i,ax2,desrib=0) 
+                
+        for i in listdf90:
+            
+            self.plotXdiff(i,ax3,desrib=0)
+            
+        ax0.set_title('Transversal T=%i K'%CH[i].T)    
+        ax1.set_title('logitudinal T=%i K'%CH[i].T)  
+        
+        
+        
+    def paraperp23SYAS(self,listdf0,path=r'C:\Users\jaime\OneDrive\Documentos\Pos-doc\Data-plots\quadrature voltage\2ndHarmic'):
+    
+        fig = plt.figure(figsize=(36,32))
+        gs0 = gridspec.GridSpec(2, 2, figure=fig,wspace=0.2,hspace=.20)
+        
+        ax0=fig.add_subplot(gs0[0,0])
+        ax1=fig.add_subplot(gs0[0,1])
+        ax2=fig.add_subplot(gs0[1,0])
+        ax3=fig.add_subplot(gs0[1,1])
+        
+        for i in listdf0:
+            
+            
+            self.plotRN(i,ax0,desrib=0) 
+            self.plotRNAS(i,ax2,desrib=0) 
+            
+        for i in listdf0:
+            
+            self.plotXN(i,ax1,desrib=0,label="%0.2f Hz"%CH[i].F) 
+            self.plotXNAS(i,ax3,desrib=0,label="%0.2f Hz"%CH[i].F) 
+        ax1.legend()
+
+
+
+         
 #%%
+
+
+
+
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
     The Savitzky-Golay filter removes high frequency noise from data.
