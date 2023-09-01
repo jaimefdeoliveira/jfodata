@@ -28,7 +28,7 @@ plt.rcParams['axes.labelsize']=32
 plt.rcParams['savefig.bbox']='tight'
 
 work=os.getcwd().split('PHD')[0]+ r'PHD\Medidas ADR\Dados py\functions'
-os.chdir (work)
+os.chdir (r'C:\Users\jaime\OneDrive\PHD\Medidas ADR\Dados py\functions')
 
 
 def pdinter(data1,dadox,dadoy,xmin,xmax,npoints=1000,smoothing=1,K=3):
@@ -160,14 +160,19 @@ def data_class(df):
 
 
 def ASSYextractinter(dfinit,X='B(T)',Y='R(ohms)',Hmax=8,K=5,smoothing=0.000000002):
+    """
+    Aqui estou fazendo explicitamente o step de 0.1 T para os dados.
+
+    """
     import jfodata
     
     try:
         Hmax=dfinit['B(T)'].max()
+        dfinit.drop_duplicates(subset=[X],inplace=True)
         inter=jfodata.pdinter(dfinit,X,Y,-Hmax,Hmax,smoothing=smoothing,npoints=400,K=K)
         df=pd.DataFrame(columns=['T(K)','Angle (deg)',X,Y])
-        for jj in range(len(inter[1])):
-            df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],inter[1][jj],inter[0](inter[1][jj])]
+        for jj in [round(i,2) for i in np.arange(-Hmax*0.98,Hmax*0.98,0.01)]:
+            df.loc[jj]=[dfinit['T(K)'][0],dfinit['Angle (deg)'][0],jj,inter[0](jj)]
         
         
         
@@ -471,8 +476,8 @@ class QVALL(DataChiral):
         self.SyAydataQVXLCH1()
         self.SyAydataQVXLCH2()
         
-    def ASSYallX(self,s=0.000000002,K=5):
-        self.SyAydataR(s,K)
+    def ASSYallX(self,s=0.000000002,K=5,s_R=30,K_R=5):
+        self.SyAydataR(s_R,K_R)
         self.SyAydataX(s,K)
         
     def describ(self,ax,key):
@@ -2157,8 +2162,8 @@ class urso:
         import numpy as np
         popt,pcov=curve_fit(f,x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],bounds=(0, np.inf),maxfev = 10000)
         if plot==1:
-            plt.plot(x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],label='data')
-            plt.plot(x[(x>limitx[0])&(x<limitx[1])],f(x[(x>limitx[0])&(x<limitx[1])],*popt),'+',label='fit')
+            plt.plot(x[(x>limitx[0])&(x<limitx[1])],y[(x>limitx[0])&(x<limitx[1])],'ok',ms=8,label='data')
+            plt.plot(x[(x>limitx[0])&(x<limitx[1])],f(x[(x>limitx[0])&(x<limitx[1])],*popt),'--r',label='fit')
             plt.legend()
         return popt,pcov
     def plot(*args):
