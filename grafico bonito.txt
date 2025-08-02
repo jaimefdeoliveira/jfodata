@@ -1,0 +1,82 @@
+# %load init.py
+"""
+Created on Wed Nov 28 19:26:01 2018
+
+@author: jaime
+
+importe basico das coisas 
+"""
+
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import numpy as np
+import math
+import pandas as pd
+
+from scipy.optimize import curve_fit
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+%matplotlib inline
+plt.rcParams['axes.linewidth'] = 1.4
+#plt.rcParams['figure.figsize']= (12,9)
+plt.rcParams['figure.figsize']= (12,12)
+plt.rcParams['savefig.transparent']= True
+plt.rcParams['font.size'] = 22
+plt.rcParams['legend.fontsize'] = 'large'
+plt.rcParams['figure.titlesize'] = 'medium'
+plt.rcParams['axes.labelsize']=42
+plt.rcParams['savefig.bbox']='tight'
+plt.rcParams['xtick.direction']='in'
+plt.rcParams['ytick.direction']='in'
+work=os.getcwd().split('PHD')[0]
+works=os.getcwd().split('Google Drive')[0]
+import matplotlib.gridspec as gridspec
+from cycler import cycler
+from lmfit import Model
+from lmfit import minimize, Parameters
+plt.rcParams['xtick.major.size']=12
+plt.rcParams['ytick.major.size']=12
+plt.rcParams['ytick.minor.size']=8
+plt.rcParams['xtick.minor.size']=8
+plt.rcParams['xtick.minor.visible']='True'
+plt.rcParams['ytick.minor.visible']='True'
+plt.rcParams['ytick.labelsize']='large'
+plt.rcParams['xtick.top']='True'
+plt.rcParams['ytick.right']='True'
+work=os.getcwd().split('PHD')[0]
+works=os.getcwd().split('Google Drive')[0]
+plt.rcParams['legend.frameon']='False'
+plt.rcParams['axes.linewidth']=3
+plt.rcParams['ytick.minor.width']=3
+plt.rcParams['ytick.major.width']=3
+
+plt.rcParams['xtick.minor.width']=3
+plt.rcParams['xtick.major.width']=3
+
+
+plt.rcParams['axes.prop_cycle'] = cycler(color=plt.cm.tab20.colors)
+
+
+
+def columname(df):
+    # Esta função recebe um DataFrame (df) como entrada e renomeia suas colunas com base na quantidade de colunas no DataFrame.
+    
+    # Define três listas de nomes de colunas predefinidas para 9, 10 e 12 colunas.
+    column9 = ['Time', 'T(K)', 'T(K)', 'X(V)', 'Y(V)', 'Mag (V)', 'Oscl(V)', 'f(Hz)', 'Pha(deg)']
+    column10 = ['Time', 'T(K)', 'T(K)', 'fr(Hz)', 'X(V)', 'Y(V)', 'Mag (V)', 'Oscl(V)', 'f(Hz)', 'Pha(deg)']
+    column12 = ['Time', 'T(K)', 'T(K)', 'fr(Hz)', 'X(V)', 'Y(V)', 'Mag (V)', 'Oscl(V)', 'f(Hz)', 'Pha(deg)', 'osc(V)', 'offset(V)']
+    
+    # Verifica o número de colunas no DataFrame de entrada.
+    if len(df.columns) == 9:
+        # Se o DataFrame tiver 9 colunas, renomeia as colunas com base na lista de nomes de colunas "column9".
+        df.rename(columns=dict(zip(df.columns, column9)), inplace=True)
+    elif len(df.columns) == 10:
+        # Se o DataFrame tiver 10 colunas, renomeia as colunas com base na lista de nomes de colunas "column10".
+        df.rename(columns=dict(zip(df.columns, column10)), inplace=True)
+    elif len(df.columns) == 12:
+        # Se o DataFrame tiver 12 colunas, renomeia as colunas com base na lista de nomes de colunas "column12".
+        df.rename(columns=dict(zip(df.columns, column12)), inplace=True)
+
+
+
